@@ -266,10 +266,13 @@ def draw_chart(select_hpname, mdc2d, mdc6d, oped):
         alt.Color("mdcname:N", title="MDC2", scale=alt.Scale(scheme=color_scheme)),
         alt.value("lightgray"),
     )
+    ####################################################################
+    # print(oped.dtypes)
     ######################################################################
     oped_base1 = (
         alt.Chart(oped).transform_filter(mdc_selection).transform_filter(mdc6_selection)
     )
+    # print(oped_base1.dtypes)
     oped_base2 = oped_base1.transform_filter(ope_selection)
     #######################################################################
     oped_base3 = (
@@ -398,7 +401,7 @@ def draw_chart(select_hpname, mdc2d, mdc6d, oped):
             )
         )
         .transform_window(
-            mdc6_rank="dense_rank(mdc6_value:Q)",
+            mdc6_rank="dense_rank()",
             sort=[alt.SortField("mdc6_value", order="descending")],
         )
         .transform_filter(alt.datum.mdc6_rank < 20)
@@ -421,17 +424,38 @@ def draw_chart(select_hpname, mdc2d, mdc6d, oped):
         align="left", baseline="middle", dx=3
     ).add_selection(mdc6_selection)
     ###################################################################
+    # 2024/3/23 変更
+    # 本番環境でerrorが発生した為。
+    # ValueError: "Q" is not one of the valid encoding data types: O, N, Q, T, G.
+    ###################################################################
+    # bofore
+    ###################################################################
+    # ope_base4 = (
+    #     oped_base1.transform_joinaggregate(
+    #         ope_value="sum(value):Q", groupby=["mdcname", "mdc6name", "opename"]
+    #     )
+    #     .transform_filter((alt.datum.opename != "0 差分"))
+    #     .transform_window(
+    #         ope_rank="dense_rank(ope_value:Q)",
+    #         sort=[alt.SortField("ope_value", order="descending")],
+    #     )
+    #     .transform_filter(alt.datum.ope_rank < 20)
+    # )
+    #########################################################################
+    # after
+    #########################################################################
     ope_base4 = (
         oped_base1.transform_joinaggregate(
             ope_value="sum(value):Q", groupby=["mdcname", "mdc6name", "opename"]
         )
         .transform_filter((alt.datum.opename != "0 差分"))
         .transform_window(
-            ope_rank="dense_rank(ope_value:Q)",
+            ope_rank="dense_rank()",
             sort=[alt.SortField("ope_value", order="descending")],
         )
         .transform_filter(alt.datum.ope_rank < 20)
     )
+    #########################################################################
     ope_bars = ope_base4.encode(
         x=alt.X("sum(value):Q", title=None),
         y=alt.Y("opename", sort="-x", title=None),

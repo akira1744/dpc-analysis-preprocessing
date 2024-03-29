@@ -9,10 +9,10 @@ from altair import datum
 import sqlite3
 import os
 
-#%%
-year=2021
+# %%
+year = "2021"
 
-#%%
+# %%
 output_dir = "output/" + year
 os.makedirs(output_dir, exist_ok=True)
 
@@ -38,6 +38,7 @@ hp = pd.read_csv(
         "med2": "category",
         "city": object,
         "bed": int,
+        "month": int,
     },
 )
 
@@ -55,7 +56,9 @@ hp.groupby(["pref_id", "pref"]).size().reset_index(name="count")
 
 # %%
 # 列の並び替え
-hp = hp.loc[:, ["hpcd", "hpname", "region_id", "pref_id", "med2", "city", "bed"]]
+hp = hp.loc[
+    :, ["hpcd", "hpname", "region_id", "pref_id", "med2", "city", "bed", "month"]
+]
 hp
 
 # %%
@@ -69,8 +72,9 @@ test
 
 # %%
 mdc2_mst = pd.read_csv(
-    os.path.join(output_dir, "mdc2_mst.csv"),    
-    encoding="cp932", dtype={"mdc2": int, "mdcname": "category"}
+    os.path.join(output_dir, "mdc2_mst.csv"),
+    encoding="cp932",
+    dtype={"mdc2": int, "mdcname": "category"},
 )
 mdc2_mst
 
@@ -127,6 +131,17 @@ mdc2d = pd.read_csv(
 mdc2d
 
 # %%
+# hpのmonth列を結合
+mdc2d = mdc2d.merge(hp[["hpcd", "month"]], left_on="hpcd", right_on="hpcd", how="left")
+# 各行でvalueをmonthでわる
+mdc2d["value"] = mdc2d["value"] / mdc2d["month"]
+# valueを四捨五入して小数点第1位までにする
+mdc2d["value"] = mdc2d["value"].round(1)
+# month列をdrop
+mdc2d = mdc2d.drop(columns="month")
+mdc2d
+
+# %%
 # mdc2dテーブルを作成
 mdc2d.to_sql("mdc2d", conn, if_exists="replace", index=False)
 
@@ -140,6 +155,17 @@ mdc6d = pd.read_csv(
     encoding="cp932",
     dtype={"hpcd": int, "mdc6": "category", "value": int},
 )
+mdc6d
+
+# %%
+# hpのmonth列を結合
+mdc6d = mdc6d.merge(hp[["hpcd", "month"]], left_on="hpcd", right_on="hpcd", how="left")
+# 各行でvalueをmonthでわる
+mdc6d["value"] = mdc6d["value"] / mdc6d["month"]
+# valueを四捨五入して小数点第1位までにする
+mdc6d["value"] = mdc6d["value"].round(1)
+# month列をdrop
+mdc6d = mdc6d.drop(columns="month")
 mdc6d
 
 # %%
@@ -159,6 +185,18 @@ oped = pd.read_csv(
 oped
 
 # %%
+# hpのmonth列を結合
+oped = oped.merge(hp[["hpcd", "month"]], left_on="hpcd", right_on="hpcd", how="left")
+# 各行でvalueをmonthでわる
+oped["value"] = oped["value"] / oped["month"]
+# valueを四捨五入して小数点第1位までにする
+oped["value"] = oped["value"].round(1)
+# month列をdrop
+oped = oped.drop(columns="month")
+oped
+
+
+# %%
 # opedテーブルを作成
 oped.to_sql("oped", conn, if_exists="replace", index=False)
 
@@ -168,3 +206,5 @@ conn.execute("CREATE INDEX idx_oped ON oped (hpcd,mdc6,ope)")
 
 conn.commit()
 conn.close()
+
+# %%

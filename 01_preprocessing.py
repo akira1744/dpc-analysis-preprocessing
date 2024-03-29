@@ -55,8 +55,6 @@ def to_unique(df, maincol, subcol):
 
 # %%
 # 1. 都道府県,2次医療圏,市町村のマスタを作成
-
-
 def make_location_mst():
     # 都道府県ー二次医療圏ー市町村ー病院のマスタデータを作成する
     location_mst = pd.read_csv(
@@ -137,7 +135,7 @@ def make_hp_mst():
         "療養病床数",
         "結核病床数",
         "病床総数",
-        "令和元年度提出月数",
+        "提出月数",
     ]
     # 告示番号がnaの行を削除
     df = df[~df["告示番号"].isna()]
@@ -152,6 +150,7 @@ def make_hp_mst():
             "DPC算定病床数",
             "病床総数",
             "DPC算定病床の入院基本料",
+            "提出月数",
         ]
     ]
     return df
@@ -178,11 +177,19 @@ def merge_hp_mst_location_mst(hp_mst, location_mst):
             "告示番号",
             "施設名",
             "病床総数",
+            "提出月数",
         ]
     ]
     print(f"hp_mst列数{len(hp_mst)}")
     print(f"hp列数{len(hp)}")
-    hp = hp.rename(columns={"告示番号": "hpcd", "施設名": "hpname", "病床総数": "bed"})
+    hp = hp.rename(
+        columns={
+            "告示番号": "hpcd",
+            "施設名": "hpname",
+            "病床総数": "bed",
+            "提出月数": "month",
+        }
+    )
     hp = to_unique(hp, "hpname", "pref")  # 病院名を固有化
     hp = hp.sort_values(
         [
@@ -200,6 +207,9 @@ def merge_hp_mst_location_mst(hp_mst, location_mst):
 hp = merge_hp_mst_location_mst(hp_mst, location_mst)
 hp.describe()
 
+# %%
+# 追加 hpcdが重複しているデータを調べる
+hp[hp.duplicated(subset="hpcd", keep=False)]
 
 # %%
 # 4.dpcのマスタを作成
@@ -345,11 +355,11 @@ def mdc6_oep_hp_load(mode="件数"):
         ddf = ddf.T  # 転置
         ddf = ddf.fillna(method="ffill")  # 上のデータで値を置き換え
         ddf["columns"] = ddf[0] + "_" + ddf[1] + "_" + ddf[2] + "_" + ddf[3]
-        ddf["columns"].iloc[:3] = ddf[3].iloc[
-            :3
-        ]  # ABC列（告示番号、通し番号、施設名)も同じ列にまとめる。
+        ddf["columns"].iloc[:3] = ddf[3].iloc[:3]
+        # ABC列（告示番号、通し番号、施設名)も同じ列にまとめる。
         columns = ddf["columns"]
         df.columns = columns
+
         # 在院日数,97(輸血以外の再掲)を削除
         df = df.iloc[4:]
         df = df.T
@@ -398,10 +408,27 @@ def merge_mdc6(mdc6_value, mdc6_stay):
     return mdc6
 
 
+##########################################################################################
 # %%
 mdc6_value = mdc6_oep_hp_load(mode="件数")
+
+# %%
+mdc6_value.to_pickle(os.path.join(output_dir, "mdc6_value.pkl"))
+
+###########################################################################################
+
 # %%
 mdc6_stay = mdc6_oep_hp_load(mode="在院日数")
+
+# %%
+mdc6_stay.to_pickle(os.path.join(output_dir, "mdc6_stay.pkl"))
+
+##########################################################################################
+
+# %%
+# pickelの読み込み
+mdc6_value = pd.read_pickle(os.path.join(output_dir, "mdc6_value.pkl"))
+mdc6_stay = pd.read_pickle(os.path.join(output_dir, "mdc6_stay.pkl"))
 
 # %%
 mdc6 = merge_mdc6(mdc6_value, mdc6_stay)
@@ -410,10 +437,11 @@ mdc6.head(1)
 # %%
 mdc6.describe(include="all")
 
-
 # %%
 # outputdirにpickelで保存
 mdc6.to_pickle(os.path.join(output_dir, "mdc6.pkl"))
+
+#########################################################################################
 
 # %%
 # pickelの読み込み
@@ -434,6 +462,7 @@ def make_mdc2():
     # 10件未満で[-]になっているデータを穴埋め
     mdc2 = mdc2.replace("-", 0)
     mdc2 = mdc2.drop(["通番"], axis="columns")
+
     # 縦持ちに変換
     mdc2 = mdc2.melt(id_vars=["告示番号", "施設名", "手術"], ignore_index=False)
     mdc2 = mdc2.rename(
@@ -588,7 +617,7 @@ hp = hp.sort_values(["value", "hpcd"], ascending=[False, True]).reset_index(drop
 hp.columns
 
 # %%
-hp_mst = hp[["hpcd", "hpname", "pref", "med2", "city", "bed"]]
+hp_mst = hp[["hpcd", "hpname", "pref", "med2", "city", "bed",'month']]
 hp_mst.describe(include="all")
 
 # %%
